@@ -127,10 +127,7 @@ fn main() {
             // .arg("--manifest-path")
             // .arg(direc.join("bewm").join("Cargo.toml"))
             .arg(
-                "--target=".to_owned()
-                    + &arch_rust_names[arch]
-                    + "-"
-                    + system_rust_names[selection],
+                "--target=".to_owned() + arch_rust_names[arch] + "-" + system_rust_names[selection],
             )
             .spawn()
             .unwrap()
@@ -147,7 +144,7 @@ fn main() {
         copy(
             direc.join(
                 "bewm_compiled/target/".to_owned()
-                    + &arch_rust_names[arch]
+                    + arch_rust_names[arch]
                     + "-"
                     + system_rust_names[selection]
                     + "/release/bewm"
