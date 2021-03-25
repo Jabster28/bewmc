@@ -1,0 +1,21 @@
+[package]
+name = "bewmc"
+version = "0.1.0"
+authors = ["Jabster28 <justynboyer@gmail.com>"]
+edition = "2018"
+license = "MIT"
+description = "An executable to make easy-to-deploy bewm executables."
+homepage = "https://github.com/jabster28/bewmc"
+repository = "https://github.com/jabster28/bewmc"
+readme = "README.md"
+keywords = ["bewm", "cross", "shell_injection"]
+categories = ["command-line-utilities"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+dialoguer = "0.8.0"
+tempdir = "0.3.7"
+colored = "2"
+interactor = "0.1.1"
+clap = "2.33.3"
