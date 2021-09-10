@@ -19,3 +19,5 @@ tempdir = "0.3.7"
 colored = "2"
 interactor = "0.1.1"
 clap = "2.33.3"
+man = "0.3.0"
+requestty = {version = "0.1.0", features=["termion"]}
